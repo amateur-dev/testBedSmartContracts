@@ -19,27 +19,28 @@ contract derived_addition {
     }
     
     function submitTransaction(address _destination, bytes memory _data)
-        public
-        returns (bool)
+        public returns (uint ans)
     {
-        uint _datalength = _data.length;
-        return external_call(_destination, _datalength, _data);
+        return external_call(_destination, _data);
     }
     
-    function external_call(address destination, uint dataLength, bytes memory data) private returns (bool) {
-        bool result;
+    function external_call(address destination, bytes memory data) private returns (uint) {
+
         assembly {
-            let x := mload(0x40)   // "Allocate" memory for output (0x40 is where "free memory" pointer is stored by convention)
-            let d := add(data, 32) // First 32 bytes are the padded length of data, so exclude that
-            result := delegatecall(
-                sub(gas(), 34710),
-                destination,
-                d,
-                dataLength,
-                x,
-                0)
-        }
-        return result;
+            let result := delegatecall(sub(gas(),40000), destination, add(data, 0x20), mload(data), 0, 0)//this builds the payload
+            let size := returndatasize()
+    
+            let ptr := mload(0x40)
+            returndatacopy(ptr, 0, size)
+    
+            // revert instead of invalid() bc if the underlying call failed with invalid() it already wasted gas.
+            // if the call returned error data, forward it
+            if iszero(result) { revert(ptr, size) }
+            return(ptr, size)
+
+            }
+            
+        
     }
     
     // call(g, a, v, in, insize, out, outsize)	
